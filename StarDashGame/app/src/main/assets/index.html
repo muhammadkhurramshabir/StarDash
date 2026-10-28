@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10162b">
+<title>Star Dash</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10162b;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#fff;touch-action:manipulation}
+#wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 25%,#24376a 0%,#10162b 62%)}
+canvas{display:block;width:100%;height:100%;max-width:600px;max-height:900px}
+#hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:18px 20px;font-weight:800;font-size:17px;text-shadow:0 2px 8px #0008;pointer-events:none}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:26px;background:#080d1c99}
+.panel{width:min(100%,370px);text-align:center;padding:28px 22px;border:1px solid #8caaff55;border-radius:24px;background:linear-gradient(145deg,#1e2b50f5,#11182ff5);box-shadow:0 20px 70px #0007}
+h1{margin:0 0 8px;font-size:36px;letter-spacing:1px}p{line-height:1.5;color:#d4defb;margin:10px 0 20px}
+button{border:0;border-radius:14px;padding:14px 24px;background:linear-gradient(90deg,#63e6be,#74a8ff);color:#10162b;font-weight:900;font-size:17px;width:100%;cursor:pointer}
+.small{font-size:12px;color:#9eadd6;margin-top:14px}
+.hidden{display:none!important}
+</style>
+</head>
+<body><div id="wrap"><canvas id="game"></canvas>
+<div id="hud"><div>⭐ <span id="score">0</span></div><div>BEST <span id="best">0</span></div></div>
+<div id="overlay"><div class="panel"><h1>STAR DASH</h1><p>Dodge the falling asteroids, collect glowing stars, and beat your best score.</p><p><b>Controls:</b> tap left or right side of the screen, or use ← → keys.</p><button id="start">PLAY</button><div class="small">Offline game · No ads · No account needed</div></div></div>
+</div>
+<script>
+(()=> {
+const canvas=document.getElementById('game'), ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'), bestEl=document.getElementById('best'), overlay=document.getElementById('overlay'), startBtn=document.getElementById('start');
+let W=0,H=0,dpr=1,player,rocks=[],stars=[],particles=[],bg=[],score=0,best=0,alive=false,last=0,spawn=0,starSpawn=0,speed=210;
+try{best=+(localStorage.getItem('stardash-best')||0)}catch(e){} bestEl.textContent=best;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=canvas.clientWidth;H=canvas.clientHeight;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(!player) resetPlayer();bg=Array.from({length:65},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.7+.3,s:15+Math.random()*40}))}
+function resetPlayer(){player={x:W/2,y:H*.79,r:13}}
+function start(){score=0;rocks=[];stars=[];particles=[];speed=210;spawn=0;starSpawn=0;resetPlayer();alive=true;last=performance.now();overlay.classList.add('hidden');scoreEl.textContent='0';requestAnimationFrame(loop)}
+function end(){alive=false;best=Math.max(best,Math.floor(score));bestEl.textContent=best;try{localStorage.setItem('stardash-best',best)}catch(e){}overlay.innerHTML=`<div class="panel"><h1>${Math.floor(score)>=best?'NICE RUN!':'GAME OVER'}</h1><p>Your score: <b>${Math.floor(score)}</b><br>Best score: <b>${best}</b></p><button id="again">PLAY AGAIN</button><div class="small">Tip: keep moving and watch for the glowing stars.</div></div>`;overlay.classList.remove('hidden');document.getElementById('again').onclick=start}
+function move(dir){if(alive){player.x=Math.max(player.r+8,Math.min(W-player.r-8,player.x+dir*W*.19))}}
+window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')move(-1);if(e.key==='ArrowRight'||e.key==='d')move(1);if((e.key===' '||e.key==='Enter')&&!alive)start()});
+canvas.addEventListener('pointerdown',e=>{if(!alive)return;const r=canvas.getBoundingClientRect();move(e.clientX-r.left<r.width/2?-1:1)});
+startBtn.onclick=start;
+function circle(x,y,r,color,glow=0){ctx.save();if(glow){ctx.shadowBlur=glow;ctx.shadowColor=color}ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore()}
+function loop(now){if(!alive)return;const dt=Math.min((now-last)/1000,.04);last=now;score+=dt*10;speed=210+Math.min(score*1.7,240);scoreEl.textContent=Math.floor(score);
+ctx.clearRect(0,0,W,H);
+for(const s of bg){s.y+=s.s*dt;if(s.y>H){s.y=-3;s.x=Math.random()*W}circle(s.x,s.y,s.r,'#b7caff')}
+spawn-=dt;starSpawn-=dt;
+if(spawn<=0){rocks.push({x:20+Math.random()*(W-40),y:-30,r:12+Math.random()*12,rot:Math.random()*6,spin:(Math.random()-.5)*2});spawn=Math.max(.24,.78-score/180)}
+if(starSpawn<=0){stars.push({x:25+Math.random()*(W-50),y:-20,r:9,phase:Math.random()*6});starSpawn=1.7+Math.random()*1.3}
+for(const r of rocks){r.y+=speed*dt;r.rot+=r.spin*dt;ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.rot);ctx.fillStyle='#ff806f';ctx.strokeStyle='#ffc0a8';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<8;i++){let a=i*Math.PI/4,rr=r.r*(.78+((i%3)*.09));if(i===0)ctx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);else ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();if(Math.hypot(player.x-r.x,player.y-r.y)<player.r+r.r*.78){end();return}}
+rocks=rocks.filter(r=>r.y<H+40);
+for(const s of stars){s.y+=(speed*.72)*dt;s.phase+=dt*4;circle(s.x,s.y,s.r+Math.sin(s.phase)*1.5,'#ffe66d',14);circle(s.x,s.y,3,'#fff8c7');if(!s.got&&Math.hypot(player.x-s.x,player.y-s.y)<player.r+s.r){s.got=true;score+=25;for(let i=0;i<10;i++)particles.push({x:s.x,y:s.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,t:.45});}}
+stars=stars.filter(s=>s.y<H+30&&!s.got);
+for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.t-=dt;circle(p.x,p.y,Math.max(1,p.t*5),'#ffe66d')}particles=particles.filter(p=>p.t>0);
+ctx.save();ctx.translate(player.x,player.y);ctx.fillStyle='#78e7ff';ctx.shadowBlur=22;ctx.shadowColor='#78e7ff';ctx.beginPath();ctx.moveTo(0,-18);ctx.lineTo(13,13);ctx.lineTo(0,8);ctx.lineTo(-13,13);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#e7fcff';ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();ctx.restore();
+requestAnimationFrame(loop)}
+window.addEventListener('resize',resize);resize();
+})();
+</script></body></html>
